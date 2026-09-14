@@ -34,8 +34,8 @@ export default async function LeadDetailPage({
   const lead = data.lead;
   const pipelineStates =
     lead.funnel === "client" ? clientPipelineStates : affiliatePipelineStates;
-  const currentIndex = pipelineStates.indexOf(
-    lead.pipeline_state as (typeof pipelineStates)[number]
+  const currentIndex = pipelineStates.findIndex(
+    (state) => state === lead.pipeline_state
   );
   const nextPipelineState =
     currentIndex >= 0 && currentIndex < pipelineStates.length - 1
