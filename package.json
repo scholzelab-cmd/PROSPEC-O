@@ -45,11 +45,18 @@
     "@types/react-dom": "19.1.9",
     "concurrently": "9.2.1",
     "drizzle-kit": "0.31.8",
-    "eslint": "9.35.0",
+    "eslint": "10.10.0",
     "eslint-config-next": "16.3.5",
     "tailwindcss": "4.3.3",
     "tsx": "4.20.5",
     "typescript": "5.9.3",
     "vitest": "3.2.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild",
+      "unrs-resolver"
+    ]
   }
 }
