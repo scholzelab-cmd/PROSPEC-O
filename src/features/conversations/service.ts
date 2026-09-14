@@ -190,6 +190,87 @@ export function reserveBrowserFirstContact(
   });
 }
 
+export function reserveBrowserFollowUp(
+  database: Database.Database,
+  input: {
+    leadId: string;
+    body: string;
+    idempotencyKey: string;
+    variantId?: string;
+  }
+): { message: MessageRow; alreadySent: boolean } {
+  const lead = getLead(database, input.leadId);
+
+  if (!lead) {
+    throw new Error(`Lead not found: ${input.leadId}`);
+  }
+
+  if (
+    lead.pipeline_state !== "contacted" ||
+    lead.channel_state !== "waiting_inbound_reply"
+  ) {
+    throw new Error("Lead is not eligible for an automated follow-up.");
+  }
+
+  return reserveMessage(database, {
+    lead,
+    channel: "browser",
+    owner: "browser",
+    body: input.body,
+    idempotencyKey: input.idempotencyKey,
+    variantId: input.variantId
+  });
+}
+
+export function markBrowserFollowUpSent(
+  database: Database.Database,
+  messageId: string
+): void {
+  database.transaction(() => {
+    const message = database
+      .prepare("SELECT * FROM messages WHERE id = ?")
+      .get(messageId) as MessageRow | undefined;
+
+    if (!message || message.channel !== "browser") {
+      throw new Error("Browser follow-up reservation not found.");
+    }
+
+    const lead = getLead(database, message.lead_id);
+
+    if (
+      !lead ||
+      lead.pipeline_state !== "contacted" ||
+      lead.channel_state !== "waiting_inbound_reply" ||
+      ownership(database, lead.id).owner !== "browser"
+    ) {
+      throw new Error("Follow-up send conflicts with current CRM state.");
+    }
+
+    const now = utcNow();
+    database
+      .prepare(
+        `UPDATE messages
+         SET status = 'sent', sent_at = ?, failure_reason = NULL
+         WHERE id = ? AND status = 'pending'`
+      )
+      .run(now, messageId);
+    database
+      .prepare(
+        `UPDATE leads
+         SET last_outbound_at = ?, next_action_at = NULL,
+             version = version + 1, updated_at = ?
+         WHERE id = ?`
+      )
+      .run(now, now, lead.id);
+    database
+      .prepare(
+        `INSERT INTO events (id, lead_id, type, actor, payload_json)
+         VALUES (?, ?, 'browser_follow_up_sent', 'worker', ?)`
+      )
+      .run(newId("event"), lead.id, JSON.stringify({ messageId }));
+  })();
+}
+
 export function markBrowserFirstContactSent(
   database: Database.Database,
   messageId: string

@@ -7,6 +7,7 @@ import { utcNow } from "@/lib/time";
 export const jobKinds = [
   "discover_profile",
   "browser_first_contact",
+  "browser_follow_up",
   "process_inbound",
   "api_reply",
   "follow_up",

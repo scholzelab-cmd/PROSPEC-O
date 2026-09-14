@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { createDatabase } from "@/db/client";
-import { log } from "@/lib/logger";
+import { logger } from "@/lib/logger";
 
 const database = createDatabase();
 database.close();
-log("info", "database_migrations_applied");
+logger.info("database_migrations_applied");
