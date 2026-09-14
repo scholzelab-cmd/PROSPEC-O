@@ -295,12 +295,6 @@ async function handleBrowserContact(
     throw new Error(`Lead not found: ${input.leadId}`);
   }
 
-  const experiment =
-    !followUp && input.mode === "live"
-      ? assignActiveVariant(dependencies.database, lead.funnel, lead.id)
-      : null;
-  const variantId = input.variantId ?? experiment?.variantId;
-
   if (input.mode === "live") {
     const pacing = evaluateContactPacing(
       dependencies.database,
@@ -313,6 +307,12 @@ async function handleBrowserContact(
       return "rescheduled";
     }
   }
+
+  const experiment =
+    !followUp && input.mode === "live"
+      ? assignActiveVariant(dependencies.database, lead.funnel, lead.id)
+      : null;
+  const variantId = input.variantId ?? experiment?.variantId;
 
   const message = followUp
     ? "Oi! Passando apenas para confirmar se faz sentido conversarmos. Se preferir, não volto a chamar."
