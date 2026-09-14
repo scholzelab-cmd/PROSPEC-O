@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - codex/**
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: file:./data/ci.db
+      OPENAI_API_KEY: ci-placeholder
+      OPENAI_MODEL: test-model-exact
+      OPENAI_MODEL_FAST: test-model-fast-exact
+      OPENAI_MONTHLY_BUDGET_USD: 25
+      AI_PRICE_INPUT_PER_MILLION_USD: 1
+      AI_PRICE_OUTPUT_PER_MILLION_USD: 1
+      CHROME_CDP_URL: http://127.0.0.1:9222
+      CHROME_PROFILE_DIR: .chrome-profile
+      BROWSER_SEND_ENABLED: "false"
+      INSTAGRAM_APP_SECRET: ci-placeholder
+      INSTAGRAM_PAGE_ACCESS_TOKEN: ci-placeholder
+      INSTAGRAM_WEBHOOK_VERIFY_TOKEN: ci-placeholder
+      INSTAGRAM_BUSINESS_ACCOUNT_ID: ci-placeholder
+      INSTAGRAM_GRAPH_API_VERSION: v99.0
+      MAX_DMS_PER_DAY: 30
+      MIN_SECONDS_BETWEEN_DMS: 90
+      MAX_SECONDS_BETWEEN_DMS: 240
+      OPERATING_HOURS: 00:00-23:59
+      OPERATING_TIMEZONE: UTC
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Configurar pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalar dependências fixadas
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Verificar tipos
+        run: pnpm typecheck
+
+      - name: Testes
+        run: pnpm test
+
+      - name: Simulação ponta a ponta
+        run: pnpm test:e2e
+
+      - name: Build de produção
+        run: pnpm build

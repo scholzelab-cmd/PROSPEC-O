@@ -1,0 +1,51 @@
+{
+  "owner": {
+    "name": "{{OWNER_NAME}}",
+    "role": "{{OWNER_ROLE}}"
+  },
+  "company": {
+    "name": "{{COMPANY_NAME}}",
+    "website": "{{COMPANY_WEBSITE}}",
+    "instagramHandle": "{{INSTAGRAM_HANDLE}}"
+  },
+  "links": {
+    "whatsapp": "{{WHATSAPP_LINK}}",
+    "affiliateGroup": "{{AFFILIATE_GROUP_LINK}}"
+  },
+  "offer": {
+    "oneLinePitch": "{{ONE_LINE_PITCH}}",
+    "howItWorks": [
+      "{{HOW_IT_WORKS_STEP_1}}",
+      "{{HOW_IT_WORKS_STEP_2}}",
+      "{{HOW_IT_WORKS_STEP_3}}"
+    ],
+    "revenueModel": "{{REVENUE_MODEL}}",
+    "marketJargon": [
+      {
+        "term": "{{MARKET_JARGON_TERM}}",
+        "meaning": "{{MARKET_JARGON_MEANING}}"
+      }
+    ]
+  },
+  "claims": {
+    "verified": [
+      {
+        "id": "{{VERIFIED_CLAIM_ID}}",
+        "text": "{{VERIFIED_CLAIM_TEXT}}",
+        "source": "{{OFFICIAL_SOURCE_URL}}"
+      }
+    ],
+    "unverified": [
+      {
+        "id": "{{UNVERIFIED_CLAIM_ID}}",
+        "text": "{{UNVERIFIED_CLAIM_TEXT}}"
+      }
+    ]
+  },
+  "audiences": {
+    "icpSegments": ["{{ICP_SEGMENT}}"],
+    "icpKeywords": ["{{ICP_KEYWORD}}"],
+    "affiliateTopics": ["{{AFFILIATE_TOPIC}}"],
+    "geography": ["{{GEOGRAPHY}}"]
+  }
+}
