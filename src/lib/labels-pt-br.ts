@@ -1,7 +1,8 @@
 import type {
   AffiliatePipelineState,
   ChannelState,
-  ClientPipelineState
+  ClientPipelineState,
+  PipelineState
 } from "@/lib/states";
 
 export const clientPipelineLabels: Record<ClientPipelineState, string> = {
@@ -26,6 +27,11 @@ export const affiliatePipelineLabels: Record<AffiliatePipelineState, string> = {
   active_affiliate: "Afiliado ativo",
   generated_customer: "Gerou cliente",
   closed: "Encerrado"
+};
+
+export const pipelineLabels: Record<PipelineState, string> = {
+  ...clientPipelineLabels,
+  ...affiliatePipelineLabels
 };
 
 export const channelLabels: Record<ChannelState, string> = {

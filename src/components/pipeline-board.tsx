@@ -1,10 +1,6 @@
 import Link from "next/link";
 import type { LeadRow } from "@/db/records";
-import {
-  affiliatePipelineLabels,
-  channelLabels,
-  clientPipelineLabels
-} from "@/lib/labels-pt-br";
+import { channelLabels, pipelineLabels } from "@/lib/labels-pt-br";
 import {
   affiliatePipelineStates,
   clientPipelineStates,
@@ -20,8 +16,6 @@ export function PipelineBoard({
 }) {
   const states =
     funnel === "client" ? clientPipelineStates : affiliatePipelineStates;
-  const labels =
-    funnel === "client" ? clientPipelineLabels : affiliatePipelineLabels;
 
   return (
     <div className="grid auto-cols-[17rem] grid-flow-col gap-3 overflow-x-auto pb-4">
@@ -34,10 +28,10 @@ export function PipelineBoard({
           <section
             className="min-h-64 rounded-xl border border-[var(--line)] bg-[#090d13] p-3"
             key={state}
-            aria-label={labels[state]}
+            aria-label={pipelineLabels[state]}
           >
             <header className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-bold">{labels[state]}</h2>
+              <h2 className="text-sm font-bold">{pipelineLabels[state]}</h2>
               <span className="rounded-full bg-[var(--surface-strong)] px-2 py-0.5 text-xs text-[var(--muted)]">
                 {stateLeads.length}
               </span>

@@ -30,7 +30,7 @@ const webhookPayloadSchema = z.object({
   )
 });
 
-export interface InboundWebhookMessage {
+export interface InboundWebhookMessage extends Record<string, unknown> {
   externalEventId: string;
   senderId: string;
   recipientId: string;
