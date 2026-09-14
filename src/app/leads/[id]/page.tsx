@@ -9,14 +9,13 @@ import { StatusPill } from "@/components/status-pill";
 import { leadDetails } from "@/db/dashboard";
 import {
   affiliatePipelineLabels,
-  affiliatePipelineStates,
   channelLabels,
-  clientPipelineStates,
   clientPipelineLabels,
   formatCurrencyFromMicros,
   formatDateTime,
   pipelineLabels
 } from "@/lib/labels-pt-br";
+import { affiliatePipelineStates, clientPipelineStates } from "@/lib/states";
 
 export const dynamic = "force-dynamic";
 

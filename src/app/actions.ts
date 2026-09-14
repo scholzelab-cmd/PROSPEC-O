@@ -186,8 +186,8 @@ export async function createExperimentAction(
     .enum(["client", "affiliate"])
     .parse(text(formData, "funnel"));
   const variable = z.string().min(2).parse(text(formData, "variable"));
-  const control = normalizeExperimentQuestion(text(formData, "control"));
-  const variant = normalizeExperimentQuestion(text(formData, "variant"));
+  const control = normalizeExperimentQuestion(text(formData, "control") ?? "");
+  const variant = normalizeExperimentQuestion(text(formData, "variant") ?? "");
   const database = getDatabase().sqlite;
   const runningExperiment = database
     .prepare("SELECT id FROM experiments WHERE funnel = ? AND status = 'running' LIMIT 1")
