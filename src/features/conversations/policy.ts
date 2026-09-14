@@ -69,6 +69,26 @@ export function verifiedClaimTexts(
   });
 }
 
+export function normalizeExperimentQuestion(value: string): string {
+  const question = value.replace(/\s+/g, " ").trim();
+
+  if (
+    question.length < 8 ||
+    question.length > 180 ||
+    !question.endsWith("?") ||
+    /[.!\n]/.test(question.slice(0, -1)) ||
+    /https?:\/\/|www\.|R\$|\d|garant|melhor|unico|lider|aprovac|resultado financeiro|taxa|preco|preço|valor/i.test(
+      normalized(question)
+    )
+  ) {
+    throw new OutboundPolicyError(
+      "Experiment content must be one short, factual question without a commercial claim."
+    );
+  }
+
+  return question;
+}
+
 export function assertNoBlockedClaim(
   config: BusinessConfig,
   message: string
@@ -95,13 +115,15 @@ export function buildFirstContact(
     funnel: Funnel;
     displayName: string | null;
     publicReference: string | null;
+    experimentQuestion?: string | null;
   }
 ): string {
   const reference = input.publicReference?.trim()
     ? ` Vi ${input.publicReference.trim()} no perfil.`
     : " Encontrei o perfil de vocês no Instagram.";
-  const question =
-    input.funnel === "client"
+  const question = input.experimentQuestion
+    ? ` ${normalizeExperimentQuestion(input.experimentQuestion)}`
+    : input.funnel === "client"
       ? " Posso fazer uma pergunta rápida sobre como vocês apresentam os projetos?"
       : " Posso fazer uma pergunta rápida sobre o conteúdo que vocês produzem?";
   const message = `${greeting(input.displayName)}${reference} Sou ${config.owner.name}, da ${config.company.name}.${question}`;
@@ -116,7 +138,6 @@ function informationMessage(
 ): string {
   const parts = [
     `Sou ${config.owner.name}, ${config.owner.role} da ${config.company.name}.`,
-    config.offer.oneLinePitch + ".",
     ...claims
   ];
 
@@ -154,7 +175,7 @@ export function renderDecision(
       break;
     case "asked_pricing":
       message =
-        "Os valores dependem do escopo. Vou encaminhar para uma análise humana antes de informar qualquer preço.";
+        "Não vou informar preço automaticamente. Vou encaminhar sua dúvida para uma análise humana.";
       break;
     case "asked_info":
     case "interested":

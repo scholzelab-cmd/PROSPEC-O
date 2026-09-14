@@ -16,7 +16,10 @@ import {
   conversationDecisionSchema
 } from "@/features/conversations/policy";
 import {
-  adaptExperimentAllocation
+  adaptExperimentAllocation,
+  assignActiveVariant,
+  recordPipelineExperimentOutcome,
+  runningExperimentIdsForLead
 } from "@/features/experiments/service";
 import {
   scoreProfile
@@ -200,6 +203,20 @@ function browserRunStarted(
   return runId;
 }
 
+function scheduleExperimentOptimization(
+  database: Database.Database,
+  leadId: string,
+  marker: string
+): void {
+  for (const experimentId of runningExperimentIdsForLead(database, leadId)) {
+    enqueueJob(database, {
+      kind: "optimize_experiment",
+      payload: { experimentId },
+      idempotencyKey: `optimize:${experimentId}:${leadId}:${marker}`
+    });
+  }
+}
+
 function browserRunFinished(
   database: Database.Database,
   runId: string,
@@ -278,6 +295,12 @@ async function handleBrowserContact(
     throw new Error(`Lead not found: ${input.leadId}`);
   }
 
+  const experiment =
+    !followUp && input.mode === "live"
+      ? assignActiveVariant(dependencies.database, lead.funnel, lead.id)
+      : null;
+  const variantId = input.variantId ?? experiment?.variantId;
+
   if (input.mode === "live") {
     const pacing = evaluateContactPacing(
       dependencies.database,
@@ -296,7 +319,8 @@ async function handleBrowserContact(
     : buildFirstContact(dependencies.business, {
         funnel: lead.funnel,
         displayName: lead.display_name,
-        publicReference: input.publicReference
+        publicReference: input.publicReference,
+        experimentQuestion: experiment?.content
       });
   const runId = browserRunStarted(
     dependencies.database,
@@ -305,7 +329,7 @@ async function handleBrowserContact(
     input.mode,
     lead.profile_url,
     message,
-    input.variantId
+    variantId
   );
   let reservedMessageId: string | undefined;
 
@@ -316,13 +340,13 @@ async function handleBrowserContact(
             leadId: lead.id,
             body: message,
             idempotencyKey: `browser_follow_up:${lead.id}:1`,
-            variantId: input.variantId
+            variantId
           })
         : reserveBrowserFirstContact(dependencies.database, {
             leadId: lead.id,
             body: message,
             idempotencyKey: `browser_first_contact:${lead.id}`,
-            variantId: input.variantId
+            variantId
           });
 
       if (reservation.alreadySent) {
@@ -514,6 +538,19 @@ async function handleInbound(
     return "completed";
   }
 
+  if (!inbound.duplicate) {
+    recordPipelineExperimentOutcome(
+      dependencies.database,
+      inbound.lead.id,
+      "replied"
+    );
+    scheduleExperimentOptimization(
+      dependencies.database,
+      inbound.lead.id,
+      "replied"
+    );
+  }
+
   const assignments = dependencies.database
     .prepare(
       `SELECT e.name, v.name AS variant
@@ -652,6 +689,15 @@ async function handleApiReply(
       "closed",
       "worker",
       "not_interested"
+    );
+  }
+
+  const finalLead = getLead(dependencies.database, input.leadId);
+  if (finalLead) {
+    scheduleExperimentOptimization(
+      dependencies.database,
+      finalLead.id,
+      finalLead.pipeline_state
     );
   }
 

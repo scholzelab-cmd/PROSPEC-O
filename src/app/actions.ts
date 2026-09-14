@@ -11,6 +11,9 @@ import {
   transitionPipeline
 } from "@/features/leads/service";
 import { getEnvironment } from "@/env";
+import { normalizeExperimentQuestion } from "@/features/conversations/policy";
+import { runningExperimentIdsForLead, recordPipelineExperimentOutcome } from "@/features/experiments/service";
+import { isPipelineStateForFunnel } from "@/features/leads/domain";
 import { newId } from "@/lib/ids";
 import { setSystemPaused } from "@/lib/system-control";
 import { enqueueJob } from "@/worker/queue";
@@ -183,9 +186,17 @@ export async function createExperimentAction(
     .enum(["client", "affiliate"])
     .parse(text(formData, "funnel"));
   const variable = z.string().min(2).parse(text(formData, "variable"));
-  const control = z.string().min(1).parse(text(formData, "control"));
-  const variant = z.string().min(1).parse(text(formData, "variant"));
+  const control = normalizeExperimentQuestion(text(formData, "control"));
+  const variant = normalizeExperimentQuestion(text(formData, "variant"));
   const database = getDatabase().sqlite;
+  const runningExperiment = database
+    .prepare("SELECT id FROM experiments WHERE funnel = ? AND status = 'running' LIMIT 1")
+    .get(funnel) as { id: string } | undefined;
+
+  if (runningExperiment) {
+    throw new Error("Já existe um experimento em execução neste funil.");
+  }
+
   const experimentId = newId("experiment");
 
   database.transaction(() => {
@@ -219,4 +230,37 @@ export async function createExperimentAction(
   })();
 
   revalidatePath("/experiments");
+}
+
+export async function transitionLeadAction(formData: FormData): Promise<void> {
+  const leadId = z.string().min(1).parse(text(formData, "leadId"));
+  const requestedState = z.string().min(1).parse(text(formData, "pipelineState"));
+  const database = getDatabase().sqlite;
+  const lead = getLead(database, leadId);
+
+  if (!lead || !isPipelineStateForFunnel(lead.funnel, requestedState)) {
+    throw new Error("A etapa escolhida não pertence ao funil deste lead.");
+  }
+
+  transitionPipeline(
+    database,
+    lead.id,
+    requestedState,
+    "operator",
+    "operator_pipeline_update"
+  );
+  recordPipelineExperimentOutcome(database, lead.id, requestedState);
+  for (const experimentId of runningExperimentIdsForLead(database, lead.id)) {
+    enqueueJob(database, {
+      kind: "optimize_experiment",
+      payload: { experimentId },
+      idempotencyKey: `optimize:${experimentId}:${lead.id}:${requestedState}`
+    });
+  }
+
+  revalidatePath("/");
+  revalidatePath("/leads");
+  revalidatePath("/funnels/clients");
+  revalidatePath("/funnels/affiliates");
+  revalidatePath(`/leads/${leadId}`);
 }

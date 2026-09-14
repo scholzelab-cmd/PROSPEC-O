@@ -2,16 +2,20 @@ import { notFound } from "next/navigation";
 import {
   doNotContactAction,
   queueDryRunAction,
+  transitionLeadAction,
   queuePilotAction
 } from "@/app/actions";
 import { StatusPill } from "@/components/status-pill";
 import { leadDetails } from "@/db/dashboard";
 import {
   affiliatePipelineLabels,
+  affiliatePipelineStates,
   channelLabels,
+  clientPipelineStates,
   clientPipelineLabels,
   formatCurrencyFromMicros,
-  formatDateTime
+  formatDateTime,
+  pipelineLabels
 } from "@/lib/labels-pt-br";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +33,21 @@ export default async function LeadDetailPage({
   }
 
   const lead = data.lead;
+  const pipelineStates =
+    lead.funnel === "client" ? clientPipelineStates : affiliatePipelineStates;
+  const currentIndex = pipelineStates.indexOf(
+    lead.pipeline_state as (typeof pipelineStates)[number]
+  );
+  const nextPipelineState =
+    currentIndex >= 0 && currentIndex < pipelineStates.length - 1
+      ? pipelineStates[currentIndex + 1]
+      : null;
+  const canOperatorAdvance =
+    nextPipelineState !== null &&
+    ["interested", "whatsapp_handoff", "registered", "joined_affiliate_group", "active_affiliate"].includes(
+      lead.pipeline_state
+    );
+
   const pipelineLabel =
     lead.funnel === "client"
       ? clientPipelineLabels[
@@ -76,6 +95,29 @@ export default async function LeadDetailPage({
           <p className="mt-2 font-bold">{formatDateTime(lead.next_action_at)}</p>
         </div>
       </section>
+
+
+      {canOperatorAdvance ? (
+        <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
+          <div>
+            <h2 className="font-bold">Atualizar resultado comercial</h2>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Registre o próximo marco confirmado para alimentar atribuição e otimização.
+            </p>
+          </div>
+          <form action={transitionLeadAction} className="flex flex-wrap gap-2">
+            <input type="hidden" name="leadId" value={lead.id} />
+            <input
+              type="hidden"
+              name="pipelineState"
+              value={nextPipelineState ?? ""}
+            />
+            <button className="button-primary" type="submit">
+              Marcar: {nextPipelineState ? pipelineLabels[nextPipelineState] : ""}
+            </button>
+          </form>
+        </section>
+      ) : null}
 
       {lead.pipeline_state === "qualified" &&
       lead.channel_state === "browser_contact_pending" ? (

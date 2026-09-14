@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { DatabaseClient } from "@/db/client";
 import {
   adaptExperimentAllocation,
+  assignActiveVariant,
   assignVariant,
-  evaluateExperiment
+  evaluateExperiment,
+  recordPipelineExperimentOutcome
 } from "@/features/experiments/service";
 import { newId } from "@/lib/ids";
 import { discoverLead } from "@/features/leads/service";
@@ -120,4 +122,51 @@ describe("controlled experiments", () => {
         .get()
     ).toMatchObject({ allocation_percent: 20 });
   });
+
+  it("assigns active experiment content and records the highest pipeline outcome", () => {
+    client = testDatabase();
+    const lead = discoverLead(client.sqlite, {
+      funnel: "client",
+      instagramUsername: "active-experiment",
+      source: "test"
+    }).lead;
+
+    client.sqlite
+      .prepare(
+        `INSERT INTO experiments (
+          id, name, funnel, variable, status, minimum_sample_size,
+          exploration_percent, started_at
+        ) VALUES ('active-experiment', 'Active experiment', 'client', 'opening', 'running', 30, 10, ?)`
+      )
+      .run(new Date().toISOString());
+    client.sqlite
+      .prepare(
+        `INSERT INTO experiment_variants (
+          id, experiment_id, name, is_control, allocation_percent, content_json
+        ) VALUES
+          ('active-control', 'active-experiment', 'Controle', 1, 50, ?),
+          ('active-variant', 'active-experiment', 'Variante', 0, 50, ?)`
+      )
+      .run(
+        JSON.stringify({ content: "Como vocês apresentam seus projetos?" }),
+        JSON.stringify({ content: "Vocês já testaram imagens com IA?" })
+      );
+
+    const assignment = assignActiveVariant(client.sqlite, "client", lead.id);
+    expect(assignment?.content).toMatch(/\?/);
+    expect(
+      client.sqlite
+        .prepare("SELECT COUNT(*) AS count FROM experiment_assignments WHERE lead_id = ?")
+        .get(lead.id)
+    ).toMatchObject({ count: 1 });
+
+    recordPipelineExperimentOutcome(client.sqlite, lead.id, "replied");
+    recordPipelineExperimentOutcome(client.sqlite, lead.id, "active_customer");
+    expect(
+      client.sqlite
+        .prepare("SELECT outcome, outcome_value FROM experiment_assignments WHERE lead_id = ?")
+        .get(lead.id)
+    ).toMatchObject({ outcome: "active_customer", outcome_value: 1 });
+  });
+
 });

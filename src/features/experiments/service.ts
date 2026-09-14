@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import { hashText, newId } from "@/lib/ids";
+import type { Funnel, PipelineState } from "@/lib/states";
 
 interface VariantRow {
   id: string;
@@ -13,11 +14,33 @@ interface ExistingAssignment {
   variant_id: string;
 }
 
+interface ActiveExperimentRow {
+  id: string;
+}
+
+interface AssignedVariantRow {
+  experiment_id: string;
+  variant_id: string;
+  content_json: string;
+}
+
+interface AssignmentOutcomeRow {
+  experiment_id: string;
+  outcome_value: number | null;
+}
+
+export interface ActiveVariantAssignment {
+  experimentId: string;
+  variantId: string;
+  content: string;
+}
+
 export interface VariantPerformance {
   variantId: string;
   name: string;
   sampleSize: number;
   conversions: number;
+  outcomeScore: number;
   conversionRate: number;
   confidenceLow: number;
   confidenceHigh: number;
@@ -30,6 +53,24 @@ export interface ExperimentEvaluation {
   variants: VariantPerformance[];
   winnerVariantId: string | null;
 }
+
+const pipelineOutcomes = {
+  discovered: null,
+  qualified: null,
+  contacted: null,
+  replied: { outcome: "reply", value: 0.15 },
+  interested: { outcome: "interest", value: 0.3 },
+  whatsapp_handoff: { outcome: "qualified_handoff", value: 0.45 },
+  registered: { outcome: "registration", value: 0.7 },
+  active_customer: { outcome: "active_customer", value: 1 },
+  joined_affiliate_group: { outcome: "joined_affiliate_group", value: 0.45 },
+  active_affiliate: { outcome: "active_affiliate", value: 0.7 },
+  generated_customer: { outcome: "generated_customer", value: 1 },
+  closed: null
+} satisfies Record<
+  PipelineState,
+  { outcome: string; value: number } | null
+>;
 
 function wilsonInterval(
   conversions: number,
@@ -53,6 +94,27 @@ function wilsonInterval(
     Math.max(0, (center - margin) / denominator),
     Math.min(1, (center + margin) / denominator)
   ];
+}
+
+function variantContent(value: string): string {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(value) as unknown;
+  } catch {
+    throw new Error("Experiment variant content is invalid JSON.");
+  }
+
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    Array.isArray(parsed) ||
+    typeof (parsed as Record<string, unknown>).content !== "string"
+  ) {
+    throw new Error("Experiment variant must contain string content.");
+  }
+
+  return (parsed as { content: string }).content;
 }
 
 export function assignVariant(
@@ -130,6 +192,66 @@ export function assignVariant(
   })();
 }
 
+export function assignActiveVariant(
+  database: Database.Database,
+  funnel: Funnel,
+  leadId: string
+): ActiveVariantAssignment | null {
+  const active = database
+    .prepare(
+      `SELECT id FROM experiments
+       WHERE funnel = ? AND status = 'running'
+       ORDER BY started_at ASC, created_at ASC
+       LIMIT 2`
+    )
+    .all(funnel) as ActiveExperimentRow[];
+
+  if (active.length > 1) {
+    throw new Error("Only one running experiment is allowed per funnel.");
+  }
+
+  const experiment = active[0];
+
+  if (!experiment) {
+    return null;
+  }
+
+  const variantId = assignVariant(database, experiment.id, leadId);
+  const assigned = database
+    .prepare(
+      `SELECT experiment_id, id AS variant_id, content_json
+       FROM experiment_variants
+       WHERE experiment_id = ? AND id = ?`
+    )
+    .get(experiment.id, variantId) as AssignedVariantRow | undefined;
+
+  if (!assigned) {
+    throw new Error("Assigned experiment variant was not found.");
+  }
+
+  return {
+    experimentId: assigned.experiment_id,
+    variantId: assigned.variant_id,
+    content: variantContent(assigned.content_json)
+  };
+}
+
+export function runningExperimentIdsForLead(
+  database: Database.Database,
+  leadId: string
+): string[] {
+  const rows = database
+    .prepare(
+      `SELECT a.experiment_id
+       FROM experiment_assignments a
+       JOIN experiments e ON e.id = a.experiment_id
+       WHERE a.lead_id = ? AND e.status = 'running'`
+    )
+    .all(leadId) as Array<{ experiment_id: string }>;
+
+  return rows.map((row) => row.experiment_id);
+}
+
 export function recordExperimentOutcome(
   database: Database.Database,
   experimentId: string,
@@ -141,9 +263,70 @@ export function recordExperimentOutcome(
     .prepare(
       `UPDATE experiment_assignments
        SET outcome = ?, outcome_value = ?, converted_at = CURRENT_TIMESTAMP
-       WHERE experiment_id = ? AND lead_id = ? AND outcome IS NULL`
+       WHERE experiment_id = ? AND lead_id = ?
+         AND (outcome_value IS NULL OR outcome_value < ?)`
     )
-    .run(outcome, value, experimentId, leadId);
+    .run(outcome, value, experimentId, leadId, value);
+}
+
+export function recordLeadExperimentOutcome(
+  database: Database.Database,
+  leadId: string,
+  outcome: string,
+  value: number
+): string[] {
+  if (value <= 0 || value > 1) {
+    throw new Error("Experiment outcome value must be greater than 0 and at most 1.");
+  }
+
+  const assignments = database
+    .prepare(
+      `SELECT a.experiment_id, a.outcome_value
+       FROM experiment_assignments a
+       JOIN experiments e ON e.id = a.experiment_id
+       WHERE a.lead_id = ? AND e.status = 'running'`
+    )
+    .all(leadId) as AssignmentOutcomeRow[];
+  const updated: string[] = [];
+
+  database.transaction(() => {
+    for (const assignment of assignments) {
+      if (
+        assignment.outcome_value !== null &&
+        assignment.outcome_value >= value
+      ) {
+        continue;
+      }
+
+      recordExperimentOutcome(
+        database,
+        assignment.experiment_id,
+        leadId,
+        outcome,
+        value
+      );
+      updated.push(assignment.experiment_id);
+    }
+  })();
+
+  return updated;
+}
+
+export function recordPipelineExperimentOutcome(
+  database: Database.Database,
+  leadId: string,
+  state: PipelineState
+): string[] {
+  const outcome = pipelineOutcomes[state];
+
+  return outcome
+    ? recordLeadExperimentOutcome(
+        database,
+        leadId,
+        outcome.outcome,
+        outcome.value
+      )
+    : [];
 }
 
 export function evaluateExperiment(
@@ -164,7 +347,14 @@ export function evaluateExperiment(
     .prepare(
       `SELECT v.id AS variant_id, v.name, v.is_control,
               COUNT(a.id) AS sample_size,
-              SUM(CASE WHEN a.outcome IS NOT NULL THEN 1 ELSE 0 END) AS conversions
+              SUM(CASE WHEN a.outcome IS NOT NULL THEN 1 ELSE 0 END) AS conversions,
+              SUM(
+                CASE
+                  WHEN a.outcome_value IS NOT NULL THEN a.outcome_value
+                  WHEN a.outcome IS NOT NULL THEN 1
+                  ELSE 0
+                END
+              ) AS outcome_score
        FROM experiment_variants v
        LEFT JOIN experiment_assignments a ON a.variant_id = v.id
        WHERE v.experiment_id = ?
@@ -177,11 +367,13 @@ export function evaluateExperiment(
       is_control: number;
       sample_size: number;
       conversions: number;
+      outcome_score: number;
     }>;
 
   const variants = rows.map((row) => {
+    const outcomeScore = row.outcome_score ?? 0;
     const [confidenceLow, confidenceHigh] = wilsonInterval(
-      row.conversions,
+      outcomeScore,
       row.sample_size
     );
 
@@ -190,8 +382,9 @@ export function evaluateExperiment(
       name: row.name,
       sampleSize: row.sample_size,
       conversions: row.conversions,
+      outcomeScore,
       conversionRate:
-        row.sample_size === 0 ? 0 : row.conversions / row.sample_size,
+        row.sample_size === 0 ? 0 : outcomeScore / row.sample_size,
       confidenceLow,
       confidenceHigh,
       isControl: row.is_control === 1
