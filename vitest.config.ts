@@ -9,10 +9,15 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    setupFiles: ["./tests/setup.ts"],
     include: ["tests/**/*.test.ts"],
     coverage: {
       reporter: ["text", "json", "html"],
-      include: ["src/features/**/*.ts", "src/worker/**/*.ts", "src/integrations/**/*.ts"]
+      include: [
+        "src/features/**/*.ts",
+        "src/worker/**/*.ts",
+        "src/integrations/**/*.ts"
+      ]
     }
   }
 });

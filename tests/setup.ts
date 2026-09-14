@@ -1,0 +1,14 @@
+process.env.OPENAI_API_KEY = "test-key";
+process.env.OPENAI_MODEL = "test-model-exact";
+process.env.OPENAI_MODEL_FAST = "test-model-fast-exact";
+process.env.OPENAI_MONTHLY_BUDGET_USD = "0.000001";
+process.env.AI_PRICE_INPUT_PER_MILLION_USD = "1";
+process.env.AI_PRICE_OUTPUT_PER_MILLION_USD = "1";
+process.env.INSTAGRAM_APP_SECRET = "test-app-secret";
+process.env.INSTAGRAM_PAGE_ACCESS_TOKEN = "test-page-token";
+process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN = "test-verify-token";
+process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID = "test-business-id";
+process.env.INSTAGRAM_GRAPH_API_VERSION = "v99.0";
+process.env.BROWSER_SEND_ENABLED = "false";
+process.env.OPERATING_HOURS = "00:00-23:59";
+process.env.OPERATING_TIMEZONE = "UTC";

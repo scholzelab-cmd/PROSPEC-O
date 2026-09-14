@@ -41,6 +41,7 @@ import type { InstagramApiClient } from "@/integrations/instagram/api";
 import type { ConversationEngine } from "@/integrations/openai/client";
 import type { RuntimeEnvironment } from "@/env";
 import type { JobRow } from "@/db/records";
+import { createBackup, verifyBackupCopy } from "@/db/backup";
 import { newId } from "@/lib/ids";
 import { setSystemPaused } from "@/lib/system-control";
 import { utcNow } from "@/lib/time";
@@ -259,7 +260,7 @@ async function handleDiscover(
       publicReference: input.publicReference ?? null,
       operatorAuthorizedAt: input.operatorAuthorizedAt
     },
-    idempotencyKey: `first_contact:${result.lead.id}`
+    idempotencyKey: `first_contact:${result.lead.id}:${input.contactMode}`
   });
 
   return "completed";
@@ -721,6 +722,23 @@ async function handleIntegrationHealth(
   return "completed";
 }
 
+async function handleBackup(
+  dependencies: HandlerDependencies
+): Promise<JobOutcome> {
+  const backup = await createBackup(dependencies.database);
+  await verifyBackupCopy(backup.path);
+  const nextRun = new Date(Date.now() + 24 * 60 * 60_000);
+
+  enqueueJob(dependencies.database, {
+    kind: "backup",
+    payload: {},
+    availableAt: nextRun.toISOString(),
+    idempotencyKey: "backup:" + nextRun.toISOString().slice(0, 10)
+  });
+
+  return "completed";
+}
+
 export async function handleJob(
   job: JobRow,
   dependencies: HandlerDependencies
@@ -742,7 +760,7 @@ export async function handleJob(
     case "integration_health":
       return handleIntegrationHealth(dependencies);
     case "backup":
-      throw new Error("Backup jobs must run through the backup command.");
+      return handleBackup(dependencies);
     default:
       throw new Error(`Unknown job kind: ${job.kind}`);
   }

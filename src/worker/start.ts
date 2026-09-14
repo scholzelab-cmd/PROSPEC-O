@@ -86,6 +86,11 @@ async function run(): Promise<void> {
     payload: {},
     idempotencyKey: `integration_health:${new Date().toISOString().slice(0, 10)}`
   });
+  enqueueJob(client.sqlite, {
+    kind: "backup",
+    payload: {},
+    idempotencyKey: "backup:" + new Date().toISOString().slice(0, 10)
+  });
 
   logger.info("worker_started", { workerId, recovered });
 
