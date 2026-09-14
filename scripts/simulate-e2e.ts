@@ -60,9 +60,10 @@ const business = {
   }
 };
 
-const client = createDatabase(":memory:");
+async function main(): Promise<void> {
+  const client = createDatabase(":memory:");
 
-try {
+  try {
   const discovered = discoverLead(client.sqlite, {
     funnel: "client",
     instagramUsername: "e2e.profile",
@@ -239,6 +240,14 @@ try {
   assert(final.owner === "api", "API ownership");
   assert(final.channel_state === "api_active", "API continuation");
   process.stdout.write(JSON.stringify(evidence, null, 2) + "\n");
-} finally {
-  client.close();
+  } finally {
+    client.close();
+  }
 }
+
+main().catch((error: unknown) => {
+  const message =
+    error instanceof Error ? (error.stack ?? error.message) : String(error);
+  process.stderr.write(message + "\n");
+  process.exitCode = 1;
+});
