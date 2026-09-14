@@ -56,9 +56,10 @@ export class InstagramApiClient {
       `https://graph.facebook.com/${version}/${encodeURIComponent(userId)}`
     );
     url.searchParams.set("fields", "id,username,name");
-    url.searchParams.set("access_token", token);
-
-    const response = await this.request(url, { method: "GET" });
+    const response = await this.request(url, {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` }
+    });
     const body = await response.text();
 
     if (!response.ok) {
@@ -80,11 +81,12 @@ export class InstagramApiClient {
     const url = new URL(
       `https://graph.facebook.com/${version}/${encodeURIComponent(accountId)}/messages`
     );
-    url.searchParams.set("access_token", token);
-
     const response = await this.request(url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json"
+      },
       body: JSON.stringify({
         recipient: { id: recipientId },
         message: { text: message }

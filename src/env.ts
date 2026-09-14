@@ -53,6 +53,14 @@ const environmentSchema = z
         message: "Must be greater than or equal to MIN_SECONDS_BETWEEN_DMS."
       });
     }
+
+    if (new URL(value.CHROME_CDP_URL).hostname !== "127.0.0.1") {
+      context.addIssue({
+        code: "custom",
+        path: ["CHROME_CDP_URL"],
+        message: "Chrome CDP must bind to 127.0.0.1."
+      });
+    }
   });
 
 export type RuntimeEnvironment = z.infer<typeof environmentSchema>;
