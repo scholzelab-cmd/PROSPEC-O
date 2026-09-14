@@ -55,9 +55,10 @@ export function createQualifiedLead(
   suffix = "one",
   funnel: "client" | "affiliate" = "client"
 ) {
+  const usernameSuffix = suffix.toLowerCase().replace(/[^a-z0-9._]/g, ".");
   const discovered = discoverLead(database, {
     funnel,
-    instagramUsername: "example." + suffix,
+    instagramUsername: "example." + usernameSuffix,
     displayName: "Perfil Exemplo",
     source: "test",
     score: 80
