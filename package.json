@@ -2,15 +2,15 @@
   "name": "prospecto",
   "version": "0.1.0",
   "private": true,
-  "description": "Local-first Instagram commercial operations system for Scholze Lab.",
+  "description": "Local-first Instagram commercial operations system.",
   "engines": {
     "node": ">=24.0.0"
   },
   "packageManager": "pnpm@12.4.1",
   "scripts": {
-    "dev": "concurrently -k -n web,worker -c cyan,magenta \"next dev\\" \"tsx watch src/worker/start.ts\"",
+    "dev": "concurrently -k -n web,worker -c cyan,magenta \"next dev\" \"tsx watch src/worker/start.ts\"",
     "build": "next build",
-    "start": "concurrently -k -n web,worker -c cyan,magenta \"next start\\" \"tsx src/worker/start.ts\"",
+    "start": "concurrently -k -n web,worker -c cyan,magenta \"next start\" \"tsx src/worker/start.ts\"",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -22,7 +22,7 @@
     "setup:business": "tsx scripts/setup-business.ts",
     "backup": "tsx scripts/backup.ts",
     "restore:test": "tsx scripts/restore-test.ts",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build"
   },
   "dependencies": {
     "better-sqlite3": "13.0.3",
