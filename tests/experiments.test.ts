@@ -127,7 +127,7 @@ describe("controlled experiments", () => {
     client = testDatabase();
     const lead = discoverLead(client.sqlite, {
       funnel: "client",
-      instagramUsername: "active-experiment",
+      instagramUsername: "active.experiment",
       source: "test"
     }).lead;
 
